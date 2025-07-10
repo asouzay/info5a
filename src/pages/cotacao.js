@@ -1,27 +1,71 @@
-import useSWR from 'swr';
-import { fetcher } from '../lib/fetcher';
+import { useState } from 'react';
+import axios from 'axios';
 
-export default function Home() {
-  const { data, error, isLoading } = useSWR(
-    'https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL?token=927c456f9a4bec44887e5cc0e2d154c8f843f33855ec2ec0d15db596ee7d19cd',
-    fetcher,
-    { refreshInterval: 5000 } // Atualiza a cada 60s //1000 == 1 segundo refresh page
-  );
+export default function Cotacao() {
+  const [inicio, setInicio] = useState('');
+  const [fim, setFim] = useState('');
+  const [cotações, setCotações] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [erro, setErro] = useState(null);
 
-  if (error) return <div>Erro ao carregar dados.</div>;
-  if (isLoading || !data) return <div>Carregando...</div>;
+  const buscarCotacoes = () => {
+    if (!inicio || !fim) {
+      alert('Preencha as duas datas!');
+      return;
+    }
 
-  const usdbrl = data.USDBRL;
+    const start_date = inicio.replace(/-/g, '');
+    const end_date = fim.replace(/-/g, '');
+
+    setLoading(true);
+    setErro(null);
+
+    axios
+      .get(`https://economia.awesomeapi.com.br/json/daily/USD-BRL/365?start_date=${start_date}&end_date=${end_date}`)
+      .then((res) => setCotações(res.data))
+      .catch(() => setErro('Erro ao buscar cotações.'))
+      .finally(() => setLoading(false));
+  };
 
   return (
-    <main style={{ padding: '2rem', fontFamily: 'Arial' }}>
-      <h1>Cotação Dólar Hoje (USD/BRL)</h1>
-      <p><strong>Compra:</strong> R$ {usdbrl.bid}</p>
-      <p><strong>Venda:</strong> R$ {usdbrl.ask}</p>
-      <p><strong>Alta:</strong> R$ {usdbrl.high}</p>
-      <p><strong>Baixa:</strong> R$ {usdbrl.low}</p>
-      <p><strong>Variação:</strong> {usdbrl.varBid} ({usdbrl.pctChange}%)</p>
-      <small>Atualizado: {new Date(Number(usdbrl.timestamp) * 1000).toLocaleString()}</small>
-    </main>
+    <div style={{ padding: '2rem' }}>
+      <h1>Buscar Cotação USD/BRL</h1>
+
+      <div style={{ marginBottom: '1rem' }}>
+        <label>
+          Data Início: <input type="date" value={inicio} onChange={(e) => setInicio(e.target.value)} />
+        </label>{' '}
+        <label>
+          Data Fim: <input type="date" value={fim} onChange={(e) => setFim(e.target.value)} />
+        </label>{' '}
+        <button onClick={buscarCotacoes}>Buscar</button>
+      </div>
+
+      {loading && <p>Carregando...</p>}
+      {erro && <p>{erro}</p>}
+
+      {cotações.length > 0 && (
+        <table border="1" cellPadding="10">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Máximo</th>
+              <th>Mínimo</th>
+              <th>Fechamento</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cotações.map((c) => (
+              <tr key={c.timestamp}>
+                <td>{new Date(c.timestamp * 1000).toLocaleDateString()}</td>
+                <td>R$ {parseFloat(c.high).toFixed(2)}</td>
+                <td>R$ {parseFloat(c.low).toFixed(2)}</td>
+                <td>R$ {parseFloat(c.bid).toFixed(2)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
   );
 }
